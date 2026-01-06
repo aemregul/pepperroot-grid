@@ -53,6 +53,9 @@ export default function Home() {
 
   useEffect(() => {
     setMounted(true);
+
+    console.log("NANOBANANA KEY:", process.env.NEXT_PUBLIC_NANOBANANA_API_KEY)
+
   }, []);
 
   // ============================================
