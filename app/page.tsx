@@ -15,7 +15,6 @@ import {
   RefreshCw,
   AlertTriangle,
   X,
-  Mouse,
   ArrowRight,
   Clock,
 } from "lucide-react";
@@ -49,13 +48,11 @@ export default function Home() {
   const [isDragging, setIsDragging] = useState(false);
   const [mounted, setMounted] = useState(false);
 
-  const [extractedImages, setExtractedImages] = useState<{index: number, url: string, status: 'extracting' | 'ready'}[]>([]);
+  const [extractedImages, setExtractedImages] = useState<{ index: number, url: string, status: 'extracting' | 'ready' }[]>([]);
 
   useEffect(() => {
     setMounted(true);
-
-    console.log("NANOBANANA KEY:", process.env.NEXT_PUBLIC_NANOBANANA_API_KEY)
-
+    console.log("NANOBANANA KEY:", process.env.NEXT_PUBLIC_NANOBANANA_API_KEY);
   }, []);
 
   // ============================================
@@ -112,8 +109,6 @@ export default function Home() {
   // ============================================
   // NANOBANANA API HELPERS
   // ============================================
-  
-  // Base64 görseli ImgBB'ye upload et
   const uploadToImgBB = async (base64Image: string): Promise<string> => {
     console.log("Uploading image to ImgBB...");
     
@@ -133,7 +128,7 @@ export default function Home() {
     console.log("Image uploaded successfully:", data.url);
     return data.url;
   };
-  
+
   const generateWithNanobanana = async (imageDataUrl: string, promptText: string): Promise<string> => {
     console.log("=== NANOBANANA API CALL ===");
     console.log("API Key exists:", !!NANOBANANA_API_KEY);
@@ -141,7 +136,6 @@ export default function Home() {
     let finalImageUrl = imageDataUrl;
     const isBase64 = imageDataUrl.startsWith('data:');
     
-    // Base64 ise önce ImgBB'ye upload et
     if (isBase64) {
       try {
         setLoadingProgress(5);
@@ -149,7 +143,6 @@ export default function Home() {
         setLoadingProgress(15);
       } catch (uploadError) {
         console.error("Upload failed, using Text-to-Image mode");
-        // Upload başarısız - Text-to-Image'a düş
         const requestBody = {
           prompt: promptText,
           numImages: 1,
@@ -178,7 +171,6 @@ export default function Home() {
       }
     }
     
-    // Image-to-Image isteği gönder
     const requestBody = {
       prompt: promptText,
       numImages: 1,
@@ -216,13 +208,12 @@ export default function Home() {
 
     console.log("Task ID:", taskId);
 
-    // 2. Task durumunu poll et
     const resultUrl = await pollTaskStatus(taskId);
     return resultUrl;
   };
 
   const pollTaskStatus = async (taskId: string): Promise<string> => {
-    const maxAttempts = 60; // 60 x 2 saniye = 2 dakika max
+    const maxAttempts = 60;
     let attempts = 0;
 
     while (attempts < maxAttempts) {
@@ -240,24 +231,18 @@ export default function Home() {
       const data = await response.json();
       const status = data.data?.successFlag;
 
-      // Status: 0 = GENERATING, 1 = SUCCESS, 2 = CREATE_TASK_FAILED, 3 = GENERATE_FAILED
       if (status === 1) {
-        // Success!
         const resultUrl = data.data?.response?.resultImageUrl;
         if (resultUrl) {
           return resultUrl;
         }
         throw new Error("No result image URL");
       } else if (status === 2 || status === 3) {
-        // Failed
         throw new Error(data.data?.errorMessage || "Generation failed");
       }
 
-      // Still generating, wait and retry
       await new Promise(resolve => setTimeout(resolve, 2000));
       attempts++;
-      
-      // Progress güncelle
       setLoadingProgress(Math.min((attempts / maxAttempts) * 100, 95));
     }
 
@@ -267,89 +252,43 @@ export default function Home() {
   // ============================================
   // PROMPT BUILDER
   // ============================================
-  
-  // URL'yi base64'e çevir (client-side canvas ile)
-  const convertUrlToBase64 = async (url: string): Promise<string> => {
-    return new Promise((resolve) => {
-      const img = new window.Image();
-      img.crossOrigin = "anonymous";
-      
-      img.onload = () => {
-        try {
-          const canvas = document.createElement("canvas");
-          canvas.width = img.width;
-          canvas.height = img.height;
-          const ctx = canvas.getContext("2d");
-          
-          if (ctx) {
-            ctx.drawImage(img, 0, 0);
-            const base64 = canvas.toDataURL("image/png");
-            console.log("Image converted to base64 successfully");
-            resolve(base64);
-          } else {
-            console.error("Canvas context error");
-            resolve(url);
-          }
-        } catch (error) {
-          console.error("Canvas conversion error:", error);
-          resolve(url);
-        }
-      };
-      
-      img.onerror = () => {
-        console.error("Image load error, using original URL");
-        resolve(url);
-      };
-      
-      // Timeout - 10 saniye içinde yüklenmezse URL'yi kullan
-      setTimeout(() => {
-        console.log("Image load timeout, using original URL");
-        resolve(url);
-      }, 10000);
-      
-      img.src = url;
-    });
-  };
-
   const buildPrompt = () => {
     const baseInstructions = `Generate a 3x3 grid with 9 COMPLETELY DIFFERENT panels. NO TEXT, NO LABELS.
-  CRITICAL: Each panel MUST be visually DISTINCT and UNIQUE - not similar copies.`;
-  
+CRITICAL: Each panel MUST be visually DISTINCT and UNIQUE - not similar copies.`;
+
     switch (topMode) {
       case "angles":
         return `${baseInstructions}
-  Transform this scene into 9 DRAMATICALLY DIFFERENT camera angles:
-  Panel 1: EXTREME WIDE - show entire room/environment
-  Panel 2: WIDE - full bodies visible
-  Panel 3: MEDIUM - waist up
-  Panel 4: CLOSE-UP - face only, intense emotion
-  Panel 5: EXTREME CLOSE-UP - eyes or hands only
-  Panel 6: LOW ANGLE - camera on ground looking up, powerful
-  Panel 7: HIGH ANGLE - bird's eye view looking down
-  Panel 8: DUTCH ANGLE - tilted 45 degrees, tension
-  Panel 9: OVER SHOULDER - from behind one character
-  Each panel must look COMPLETELY DIFFERENT from others. Vary composition dramatically.`;
-  
+Transform this scene into 9 DRAMATICALLY DIFFERENT camera angles:
+Panel 1: EXTREME WIDE - show entire room/environment
+Panel 2: WIDE - full bodies visible
+Panel 3: MEDIUM - waist up
+Panel 4: CLOSE-UP - face only, intense emotion
+Panel 5: EXTREME CLOSE-UP - eyes or hands only
+Panel 6: LOW ANGLE - camera on ground looking up, powerful
+Panel 7: HIGH ANGLE - bird's eye view looking down
+Panel 8: DUTCH ANGLE - tilted 45 degrees, tension
+Panel 9: OVER SHOULDER - from behind one character
+Each panel must look COMPLETELY DIFFERENT from others. Vary composition dramatically.`;
+
       case "thumbnail":
         return `${baseInstructions}
-  Create 9 DRAMATICALLY DIFFERENT thumbnail crops:
-  Vary zoom level from extreme wide to extreme close.
-  Each panel must have UNIQUE framing and focal point.`;
-  
+Create 9 DRAMATICALLY DIFFERENT thumbnail crops:
+Vary zoom level from extreme wide to extreme close.
+Each panel must have UNIQUE framing and focal point.`;
+
       case "storyboard":
         return `${baseInstructions}
-  Create 9 sequential story moments - each panel shows DIFFERENT action/moment.
-  Time must progress between panels. Show movement and change.`;
-  
+Create 9 sequential story moments - each panel shows DIFFERENT action/moment.
+Time must progress between panels. Show movement and change.`;
+
       default:
         return baseInstructions;
     }
   };
-  
-  
 
   // ============================================
-  // NANOBANANA API - GRID GENERATION
+  // GRID GENERATION WITH CLAUDE
   // ============================================
   const generateGrid = async () => {
     if (!image) return;
@@ -360,40 +299,60 @@ export default function Home() {
     setSelected([]);
     setExtractedImages([]);
 
-    setLoading(true);
-    setLoadingProgress(0);
-    setError(null);
-    setSelected([]);
-    setExtractedImages([]);
-
     try {
-      // Grid generation prompt
-      let gridPrompt = buildPrompt();
-      
-      // Custom mode ise kullanıcı prompt'unu ekle
-      if (mode === "self" && prompt) {
-        gridPrompt += ` Additional style: ${prompt}`;
+      let gridPrompt = "";
+
+      // AUTO mode: Claude ile analiz et
+      if (mode === "auto") {
+        console.log("=== CLAUDE ANALYSIS ===");
+        setLoadingProgress(5);
+        
+        try {
+          const analyzeResponse = await fetch('/api/analyze', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              image,
+              mode: topMode,
+              aspect
+            }),
+          });
+
+          if (!analyzeResponse.ok) {
+            throw new Error('Claude analysis failed');
+          }
+
+          const analyzeData = await analyzeResponse.json();
+          gridPrompt = analyzeData.prompt;
+          console.log("Claude generated prompt:", gridPrompt);
+          setLoadingProgress(15);
+        } catch (analyzeError) {
+          console.error("Claude analysis failed, using fallback:", analyzeError);
+          gridPrompt = buildPrompt();
+        }
+      } else {
+        // CUSTOM mode
+        gridPrompt = buildPrompt();
+        if (prompt) {
+          gridPrompt += ` Additional style: ${prompt}`;
+        }
       }
 
       console.log("=== GENERATE GRID ===");
-      console.log("Prompt:", gridPrompt);
-      console.log("Has API Key:", !!NANOBANANA_API_KEY && NANOBANANA_API_KEY.length > 0);
+      console.log("Final Prompt:", gridPrompt);
 
       if (NANOBANANA_API_KEY && NANOBANANA_API_KEY.length > 0) {
-        // Gerçek API çağrısı
         console.log("Using REAL API");
-        setLoadingProgress(5);
+        setLoadingProgress(20);
         
         const resultImageUrl = await generateWithNanobanana(image, gridPrompt);
         setLoadingProgress(100);
         
-        // Kısa bekleme
         await new Promise(resolve => setTimeout(resolve, 300));
         
         setGridImage(resultImageUrl);
         setGridGenerated(true);
       } else {
-        // DEMO MODE - API key yoksa simülasyon
         console.log("Using DEMO MODE - No API key found");
         for (let i = 0; i <= 100; i += Math.random() * 15 + 5) {
           setLoadingProgress(Math.min(i, 99));
@@ -422,10 +381,8 @@ export default function Home() {
       throw new Error("No grid image");
     }
 
-    // Eğer gridImage zaten base64 ise direkt kullan
     let imageToUse = gridImage;
     
-    // Eğer URL ise, önce server-side proxy ile base64'e çevir
     if (!gridImage.startsWith('data:')) {
       try {
         const response = await fetch(`/api/download?url=${encodeURIComponent(gridImage)}`);
@@ -478,7 +435,7 @@ export default function Home() {
   };
 
   // ============================================
-  // NANOBANANA API - UPSCALE & EXTRACT
+  // UPSCALE & EXTRACT
   // ============================================
   const handleExtract = async () => {
     if (selected.length === 0) return;
@@ -487,8 +444,7 @@ export default function Home() {
     setExtractionProgress(0);
     setError(null);
     
-    // Initialize extracted images with extracting status
-    const initialImages: {index: number, url: string, status: 'extracting' | 'ready'}[] = selected.map(index => ({
+    const initialImages: { index: number, url: string, status: 'extracting' | 'ready' }[] = selected.map(index => ({
       index,
       url: '',
       status: 'extracting'
@@ -502,25 +458,21 @@ export default function Home() {
 
         let finalImageUrl = croppedImage;
 
-        // Upscale with Nanobanana API if key exists and scale > 1
         if (NANOBANANA_API_KEY && scale > 1) {
           try {
             const upscalePrompt = `Upscale this image to ${scale}x resolution. Enhance details, maintain sharpness, and preserve the original style and colors. High quality ${scale === 4 ? '4K' : 'HD'} output.`;
             finalImageUrl = await generateWithNanobanana(croppedImage, upscalePrompt);
           } catch (upscaleError) {
             console.error("Upscale failed, using original:", upscaleError);
-            // Upscale başarısız olursa orijinal cropped image'ı kullan
             finalImageUrl = croppedImage;
           }
         } else {
-          // Demo mode veya 1x scale - sadece crop
           await new Promise((resolve) => setTimeout(resolve, 1500));
         }
 
-        // Update the specific image status to ready
         setExtractedImages(prev => {
-          const newImages = prev.map(img => 
-            img.index === cellIndex 
+          const newImages = prev.map(img =>
+            img.index === cellIndex
               ? { index: img.index, url: finalImageUrl, status: 'ready' as const }
               : img
           );
@@ -541,13 +493,11 @@ export default function Home() {
     const readyImages = extractedImages.filter(img => img.status === 'ready');
     for (const img of readyImages) {
       await downloadSingleImage(img);
-      // Birden fazla indirme arasında küçük gecikme
       await new Promise(resolve => setTimeout(resolve, 300));
     }
   };
 
-  const downloadSingleImage = async (img: {index: number, url: string}) => {
-    // Eğer base64 ise direkt indir
+  const downloadSingleImage = async (img: { index: number, url: string }) => {
     if (img.url.startsWith('data:')) {
       const link = document.createElement("a");
       link.href = img.url;
@@ -558,7 +508,6 @@ export default function Home() {
       return;
     }
     
-    // URL ise API route üzerinden indir (CORS bypass)
     const downloadUrl = `/api/download?url=${encodeURIComponent(img.url)}`;
     const link = document.createElement("a");
     link.href = downloadUrl;
@@ -585,7 +534,6 @@ export default function Home() {
   const downloadGrid = async () => {
     if (!gridImage) return;
     
-    // Eğer base64 ise direkt indir
     if (gridImage.startsWith('data:')) {
       const link = document.createElement("a");
       link.href = gridImage;
@@ -596,7 +544,6 @@ export default function Home() {
       return;
     }
     
-    // URL ise - server-side proxy ile indir
     try {
       const response = await fetch(`/api/download?url=${encodeURIComponent(gridImage)}`);
       
@@ -690,7 +637,6 @@ export default function Home() {
           onDragOver={handleDragOver}
           onDragLeave={handleDragLeave}
         >
-        
           {!image && (
             <span className="text-white text-4xl font-bold tracking-wide">
               DROP IMAGE HERE
@@ -705,21 +651,11 @@ export default function Home() {
                 className="absolute inset-0 w-full h-full object-contain pointer-events-none"
               />
               
-              {/* Loading overlay */}
               {loading && (
                 <div className="absolute inset-0 bg-[#1a1a1a]/95 flex flex-col items-center justify-center gap-6 z-20">
-                  {/* Circular progress */}
                   <div className="relative w-24 h-24">
-                    {/* Background circle */}
                     <svg className="w-24 h-24 -rotate-90">
-                      <circle
-                        cx="48"
-                        cy="48"
-                        r="40"
-                        stroke="#333"
-                        strokeWidth="6"
-                        fill="none"
-                      />
+                      <circle cx="48" cy="48" r="40" stroke="#333" strokeWidth="6" fill="none" />
                       <circle
                         cx="48"
                         cy="48"
@@ -733,22 +669,18 @@ export default function Home() {
                         className="transition-all duration-300"
                       />
                     </svg>
-                    {/* Percentage text */}
                     <div className="absolute inset-0 flex items-center justify-center">
                       <span className="text-white text-xl font-bold">
                         {Math.round(loadingProgress)}%
                       </span>
                     </div>
                   </div>
-                  
-                  {/* Processing text */}
                   <p className="text-white text-lg font-bold tracking-[0.2em]">
                     PROCESSING IMAGE DATA
                   </p>
                 </div>
               )}
 
-              {/* Hover overlay - sadece loading değilken */}
               {!loading && (
                 <div className="absolute inset-0 bg-black/0 hover:bg-black/50 transition-all duration-300 flex items-center justify-center group">
                   <div className="flex items-center gap-3 opacity-0 group-hover:opacity-100 transition-all duration-300">
@@ -776,7 +708,6 @@ export default function Home() {
       {image && (
         <div className={`flex flex-col items-center gap-5 transition-all duration-500 ${image ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"} ${loading ? "opacity-50 pointer-events-none" : ""}`}>
           <div className="flex items-center gap-6">
-            {/* Aspect Ratio */}
             <div className="flex flex-col items-center gap-2">
               <span className="text-[10px] tracking-[0.3em] text-gray-600 font-medium">
                 ASPECT RATIO
@@ -800,7 +731,6 @@ export default function Home() {
 
             <div className="w-px h-12 bg-[#222]" />
 
-            {/* Mode Toggle */}
             <div className="flex flex-col items-center gap-2">
               <span className="text-[10px] tracking-[0.3em] text-gray-600 font-medium">
                 PROMPT MODE
@@ -832,7 +762,6 @@ export default function Home() {
             </div>
           </div>
 
-          {/* Custom Prompt */}
           {mode === "self" && (
             <div className="w-[500px]">
               <div className="relative">
@@ -849,7 +778,6 @@ export default function Home() {
             </div>
           )}
 
-          {/* Generate Button */}
           <button
             onClick={generateGrid}
             disabled={loading}
@@ -897,10 +825,8 @@ export default function Home() {
       {/* GRID SELECTION */}
       {gridGenerated && gridImage && (
         <div className="flex flex-col items-center gap-3 mt-2 w-full">
-          {/* Divider line - saydam */}
           <div className="w-[95vw] max-w-7xl h-[1px] bg-white/10" />
           
-          {/* Grid Controls - SELECT ALL sol, DOWNLOAD sağ */}
           <div className="w-[95vw] max-w-7xl flex justify-between items-center mt-4">
             <button
               onClick={selectAll}
@@ -932,11 +858,10 @@ export default function Home() {
             </button>
           </div>
 
-          {/* GRID */}
           <div className="relative w-[95vw] max-w-7xl overflow-hidden">
-            <div 
+            <div
               className="w-full grid"
-              style={{ 
+              style={{
                 display: 'grid',
                 gridTemplateColumns: 'repeat(3, 1fr)',
                 gridTemplateRows: 'repeat(3, 1fr)',
@@ -951,7 +876,7 @@ export default function Home() {
                 const isExtracting = extractedImg?.status === 'extracting';
                 const isExtracted = extractedImg?.status === 'ready';
                 const isDisabled = isExtracting || isExtracted;
-                
+
                 return (
                   <div
                     key={i}
@@ -969,20 +894,16 @@ export default function Home() {
                   >
                     <div
                       className={`absolute inset-0 transition-all duration-200 ${
-                        isDisabled
-                          ? ""
-                          : "bg-transparent group-hover:bg-white/5"
+                        isDisabled ? "" : "bg-transparent group-hover:bg-white/5"
                       }`}
                     />
 
-                    {/* EXTRACTED badge - sol üst */}
                     {isExtracted && (
                       <div className="absolute top-2 left-2 flex items-center gap-1.5 bg-black/50 backdrop-blur-sm border border-emerald-500/50 px-3 py-1.5 rounded text-xs font-medium text-emerald-400 tracking-wide">
                         EXTRACTED
                       </div>
                     )}
 
-                    {/* REGENERATING badge - sol üst */}
                     {isExtracting && (
                       <div className="absolute top-2 left-2 flex items-center gap-1.5 bg-black/50 backdrop-blur-sm border border-yellow-500/50 px-3 py-1.5 rounded text-xs font-medium text-yellow-400 tracking-wide">
                         <RefreshCw size={12} className="animate-spin" />
@@ -990,7 +911,6 @@ export default function Home() {
                       </div>
                     )}
 
-                    {/* Numara badge - sol alt (sadece extracted/extracting değilse) */}
                     {!isExtracted && !isExtracting && (
                       <div
                         className={`absolute bottom-2 left-2 px-1.5 py-0.5 rounded text-xs font-medium transition-all duration-200 ${
@@ -1003,16 +923,14 @@ export default function Home() {
                       </div>
                     )}
 
-                    {/* Selection border - kalın saydam çerçeve */}
                     <div
                       className={`absolute inset-0 transition-all duration-200 pointer-events-none ${
-                        isSelected || isExtracted || isExtracting 
-                          ? "border-4 border-emerald-400/70" 
+                        isSelected || isExtracted || isExtracting
+                          ? "border-4 border-emerald-400/70"
                           : "border-transparent"
                       }`}
                     />
 
-                    {/* Checkmark - sağ üst */}
                     <div
                       className={`absolute top-2 right-2 w-5 h-5 rounded-full flex items-center justify-center transition-all duration-200 ${
                         isSelected || isExtracted
@@ -1083,7 +1001,6 @@ export default function Home() {
       {/* EXTRACTION QUEUE */}
       {extractedImages.length > 0 && (
         <div className="flex flex-col items-center gap-6 w-full py-8">
-          {/* Divider line with arrow */}
           <div className="w-[95vw] max-w-7xl flex flex-col items-center gap-0">
             <div className="w-full h-[1px] bg-white/20" />
             <div className="w-10 h-10 -mt-5 rounded-full border border-white/20 bg-[#0a0a0a] flex items-center justify-center">
@@ -1091,7 +1008,6 @@ export default function Home() {
             </div>
           </div>
 
-          {/* Header */}
           <div className="flex items-center gap-3">
             <h2 className="text-2xl font-bold tracking-wider text-emerald-400">
               EXTRACTION QUEUE
@@ -1099,7 +1015,6 @@ export default function Home() {
             <span className="text-gray-500 text-2xl">({extractedImages.length})</span>
           </div>
 
-          {/* Download button */}
           <div className="w-[95vw] max-w-7xl flex justify-end">
             {extracting ? (
               <div className="flex items-center gap-2 bg-[#1a1a1a] border border-[#333] px-4 py-2.5 rounded-lg text-sm">
@@ -1117,34 +1032,28 @@ export default function Home() {
             )}
           </div>
 
-          {/* Extracted images grid */}
           <div className="w-[95vw] max-w-7xl grid grid-cols-3 gap-2">
             {extractedImages.map((img) => (
               <div
                 key={img.index}
-                className={`relative aspect-[21/10] bg-[#111] overflow-hidden group`}
+                className="relative aspect-[21/10] bg-[#111] overflow-hidden group"
                 style={{
                   backgroundImage: img.status === 'ready' ? `url(${img.url})` : `url(${gridImage})`,
                   backgroundSize: img.status === 'ready' ? 'cover' : '300% 300%',
                   backgroundPosition: img.status === 'ready' ? 'center' : `${(img.index % 3) * 50}% ${Math.floor(img.index / 3) * 50}%`,
                 }}
               >
-                {/* Dark overlay for extracting */}
                 {img.status === 'extracting' && (
                   <div className="absolute inset-0 bg-black/70 flex flex-col items-center justify-center gap-3">
-                    {/* Spinner */}
                     <div className="w-10 h-10 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin" />
                   </div>
                 )}
 
-                {/* Hover overlay with buttons - sadece ready durumunda */}
                 {img.status === 'ready' && (
                   <div className="absolute bottom-3 right-3 flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-all duration-300">
-                    {/* Upload as input button */}
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
-                        // Upload as input - görseli ana input olarak kullan
                         setImage(img.url);
                         setGridImage(null);
                         setGridGenerated(false);
@@ -1157,23 +1066,16 @@ export default function Home() {
                       UPLOAD AS INPUT
                     </button>
 
-                    {/* Retry upscale button */}
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
-                        // Retry - bu görseli tekrar upscale et
-                        // TODO: Implement retry logic
                       }}
                       className="w-10 h-10 rounded-full bg-[#333] hover:bg-[#444] flex items-center justify-center transition-all group/btn relative"
                       title="Retry upscale"
                     >
                       <RefreshCw size={16} className="text-white" />
-                      <span className="absolute -top-8 left-1/2 -translate-x-1/2 bg-[#222] text-white text-xs px-2 py-1 rounded opacity-0 group-hover/btn:opacity-100 whitespace-nowrap transition-opacity">
-                        Retry upscale
-                      </span>
                     </button>
 
-                    {/* Download button */}
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
@@ -1183,17 +1085,13 @@ export default function Home() {
                       title="Download image"
                     >
                       <Download size={16} className="text-white" />
-                      <span className="absolute -top-8 left-1/2 -translate-x-1/2 bg-[#222] text-white text-xs px-2 py-1 rounded opacity-0 group-hover/btn:opacity-100 whitespace-nowrap transition-opacity">
-                        Download image
-                      </span>
                     </button>
                   </div>
                 )}
 
-                {/* Status badge */}
                 <div className={`absolute bottom-3 left-3 px-2 py-1 text-xs font-medium tracking-wider ${
-                  img.status === 'extracting' 
-                    ? 'bg-emerald-500/20 text-emerald-400' 
+                  img.status === 'extracting'
+                    ? 'bg-emerald-500/20 text-emerald-400'
                     : 'bg-emerald-500 text-black'
                 }`}>
                   {img.status === 'extracting' ? 'EXTRACTING ...' : `READY • ${scale}X`}
@@ -1217,8 +1115,8 @@ export default function Home() {
           <div className="flex flex-col items-center gap-3 max-w-2xl text-center">
             <p className="text-yellow-500 font-bold text-lg tracking-widest">WARNING:</p>
             <p className="text-gray-400 text-sm leading-relaxed">
-              CLICKING "GO AGAIN" WILL RESTART THE ENTIRE PROCESS. ANY EXTRACTED
-              IMAGES THAT HAVEN'T BEEN DOWNLOADED WILL BE PERMANENTLY LOST
+              CLICKING &quot;GO AGAIN&quot; WILL RESTART THE ENTIRE PROCESS. ANY EXTRACTED
+              IMAGES THAT HAVEN&apos;T BEEN DOWNLOADED WILL BE PERMANENTLY LOST
               AND CANNOT BE RECOVERED.
             </p>
             <p className="text-gray-600 text-xs tracking-wide mt-1">
@@ -1227,8 +1125,6 @@ export default function Home() {
           </div>
         </div>
       )}
-
-
     </main>
   );
 }
