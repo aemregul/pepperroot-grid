@@ -13,8 +13,11 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "DorLabs Internal Tool",
+  title: "PepperGrids",
   description: "AI image grid & upscale tool",
+  icons: {
+    icon: "/favicon.svg",
+  },
 };
 
 export default function RootLayout({
