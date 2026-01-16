@@ -48,21 +48,25 @@ export default function Home() {
   const [extractedImages, setExtractedImages] = useState<{ index: number; url: string; status: "extracting" | "ready" }[]>([]);
 
   useEffect(() => {
-    // Auth kontrolü
-    const checkAuth = () => {
-      const cookies = document.cookie.split(';');
-      const authCookie = cookies.find(c => c.trim().startsWith('site-auth='));
+    const checkAuth = async () => {
+      try {
+        const res = await fetch('/api/auth/check');
+        const data = await res.json();
 
-      if (!authCookie || !authCookie.includes('authenticated')) {
-        router.push('/auth');
-        return;
+        if (!data.authenticated) {
+          window.location.href = '/auth';
+          return;
+        }
+
+        setAuthChecked(true);
+        setMounted(true);
+      } catch (error) {
+        window.location.href = '/auth';
       }
-      setAuthChecked(true);
-      setMounted(true);
     };
 
     checkAuth();
-  }, [router]);
+  }, []);
 
   // Auth kontrolü tamamlanmadan hiçbir şey gösterme
   if (!authChecked) {
