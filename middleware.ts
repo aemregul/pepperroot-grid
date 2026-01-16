@@ -2,36 +2,31 @@ import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 
 export function middleware(request: NextRequest) {
-    // Şifre kontrolü için cookie kontrol et
-    const isAuthenticated = request.cookies.get('site-auth')?.value === 'authenticated';
+    // Auth sayfasına ve API'lere izin ver
+    const { pathname } = request.nextUrl;
 
-    // Auth sayfasına erişime izin ver
-    if (request.nextUrl.pathname === '/auth') {
+    if (
+        pathname === '/auth' ||
+        pathname.startsWith('/api/auth') ||
+        pathname.startsWith('/_next') ||
+        pathname.startsWith('/favicon') ||
+        pathname.includes('.')
+    ) {
         return NextResponse.next();
     }
 
-    // API route'larına izin ver (auth API için)
-    if (request.nextUrl.pathname.startsWith('/api/auth')) {
-        return NextResponse.next();
-    }
+    // Cookie kontrolü
+    const authCookie = request.cookies.get('site-auth');
 
-    // Authenticated değilse auth sayfasına yönlendir
-    if (!isAuthenticated) {
-        return NextResponse.redirect(new URL('/auth', request.url));
+    if (authCookie?.value !== 'authenticated') {
+        // Auth sayfasına yönlendir
+        const authUrl = new URL('/auth', request.url);
+        return NextResponse.redirect(authUrl);
     }
 
     return NextResponse.next();
 }
 
 export const config = {
-    matcher: [
-        /*
-         * Match all request paths except:
-         * - _next/static (static files)
-         * - _next/image (image optimization files)
-         * - favicon.ico (favicon file)
-         * - public files
-         */
-        '/((?!_next/static|_next/image|favicon.ico|.*\\.png$|.*\\.jpg$|.*\\.svg$).*)',
-    ],
+    matcher: ['/((?!_next/static|_next/image|favicon.ico).*)'],
 };
